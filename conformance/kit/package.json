@@ -1,0 +1,14 @@
+{
+  "name": "ocaml-solana-kit-conformance",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "generate": "node generate.mjs"
+  },
+  "dependencies": {
+    "@solana/kit": "8.0.0"
+  }
+}

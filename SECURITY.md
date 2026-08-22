@@ -12,5 +12,9 @@ an external signer through `Transaction.signing_bytes` and
 Treat RPC responses and address-table contents as untrusted. Pin the expected
 genesis hash, resolve version-0 tables from an authenticated source, inspect the
 derived intent, simulate, and enforce an application-specific policy before
-signing. The built-in safe-transfer policy accepts one SOL transfer plus only
-recognized Compute Budget instructions.
+signing. The built-in SOL policy accepts one transfer plus only recognized
+Compute Budget instructions. The token policy accepts one `TransferChecked`,
+an optional matching idempotent ATA creation, and Compute Budget instructions.
+It rejects opaque instructions, mismatched ATAs, unrelated transfers, and
+Token-2022 unless the caller explicitly opts in after authenticating and
+reviewing mint extensions such as fees and transfer hooks.

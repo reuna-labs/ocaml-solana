@@ -8,5 +8,8 @@
   message compilation, address lookup tables, and strict shortvec codecs.
 - Add System transfer and Compute Budget instructions with compiled-byte intent
   review.
+- Add Solana PDA and associated-token-account derivation, classic Token and
+  Token-2022 `TransferChecked`, strict token intent policy, and independently
+  regenerable Kit 8.0.0 / Agave 4.2.1 conformance fixtures.
 - Add typed transport-independent JSON-RPC, Unix Cohttp, confirmation expiry,
   an opt-in Devnet transfer smoke, golden fixtures, and Mirage-safe link checks.

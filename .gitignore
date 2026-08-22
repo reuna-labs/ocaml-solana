@@ -4,3 +4,5 @@
 *.merlin
 *.swp
 .DS_Store
+node_modules/
+conformance/agave/target/

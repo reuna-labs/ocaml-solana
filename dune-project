@@ -25,6 +25,7 @@
   (ocaml (>= 4.14))
   (dune (>= 3.6))
   (solana-types (= :version))
+  (digestif (>= 1.2.0))
   mirage-crypto-ec))
 
 (package

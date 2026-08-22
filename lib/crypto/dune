@@ -1,4 +1,4 @@
 (library
  (name solana_crypto)
  (public_name solana-crypto)
- (libraries solana-types mirage-crypto-ec))
+ (libraries solana-types digestif mirage-crypto-ec))

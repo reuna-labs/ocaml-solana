@@ -1,6 +1,9 @@
 (test
  (name test_solana)
  (package solana)
+ (deps
+  ../conformance/fixtures/kit-8.0.0-token.json
+  ../conformance/fixtures/agave-4.2.1-token.json)
  (libraries
   solana-types
   solana-crypto

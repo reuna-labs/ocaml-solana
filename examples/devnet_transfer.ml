@@ -54,10 +54,6 @@ let run () =
     let destination =
       required_env "SOLANA_DESTINATION" |> Solana_types.Address.of_base58 |> get
     in
-    let lamports =
-      Sys.getenv_opt "SOLANA_LAMPORTS" |> Option.value ~default:"5000"
-      |> Solana_types.U64.of_string |> get
-    in
     let uri =
       Sys.getenv_opt "SOLANA_RPC_URL"
       |> Option.value ~default:"https://api.devnet.solana.com" |> Uri.of_string
@@ -77,9 +73,56 @@ let run () =
     else
       let* latest = call transport (Solana_rpc.Methods.get_latest_blockhash ()) in
       let payer = Solana_crypto.address keypair in
-      let instructions =
-        [ Solana_transaction.Programs.set_compute_unit_limit 20_000 |> get;
-          Solana_transaction.Programs.transfer ~from:payer ~to_:destination ~lamports ]
+      let instructions, validate =
+        match Sys.getenv_opt "SOLANA_TOKEN_MINT" with
+        | None | Some "" ->
+          let lamports =
+            Sys.getenv_opt "SOLANA_LAMPORTS" |> Option.value ~default:"5000"
+            |> Solana_types.U64.of_string |> get
+          in
+          ( [ Solana_transaction.Programs.set_compute_unit_limit 20_000 |> get;
+              Solana_transaction.Programs.transfer ~from:payer ~to_:destination
+                ~lamports ],
+            Solana_transaction.Intent.validate_safe_sol_transfer )
+        | Some encoded_mint ->
+          let mint = Solana_types.Address.of_base58 encoded_mint |> get in
+          let amount = required_env "SOLANA_TOKEN_AMOUNT" |> Solana_types.U64.of_string |> get in
+          let decimals = required_env "SOLANA_TOKEN_DECIMALS" |> int_of_string in
+          let token_program, allow_token_2022 =
+            match Sys.getenv_opt "SOLANA_TOKEN_PROGRAM" with
+            | None | Some "" | Some "token" -> Solana_transaction.Programs.Token, false
+            | Some "token-2022" ->
+              if Sys.getenv_opt "SOLANA_ALLOW_TOKEN_2022" <> Some "1" then
+                invalid_arg
+                  "Token-2022 requires SOLANA_ALLOW_TOKEN_2022=1 after mint-extension review";
+              Solana_transaction.Programs.Token_2022, true
+            | Some _ -> invalid_arg "SOLANA_TOKEN_PROGRAM must be token or token-2022"
+          in
+          let source, _ =
+            Solana_transaction.Programs.associated_token_address ~owner:payer ~mint
+              ~token_program
+            |> get
+          in
+          let target, _ =
+            Solana_transaction.Programs.associated_token_address ~owner:destination ~mint
+              ~token_program
+            |> get
+          in
+          let create =
+            Solana_transaction.Programs.create_associated_token_account_idempotent
+              ~payer ~owner:destination ~mint ~token_program
+            |> get
+          in
+          let transfer =
+            Solana_transaction.Programs.transfer_checked ~source ~mint
+              ~destination:target ~authority:payer ~amount ~decimals ~token_program
+            |> get
+          in
+          ( [ Solana_transaction.Programs.set_compute_unit_limit 50_000 |> get;
+              create;
+              transfer ],
+            Solana_transaction.Intent.validate_safe_token_transfer
+              ~allow_token_2022 )
       in
       let message =
         Solana_transaction.Message.compile_legacy ~payer
@@ -87,7 +130,7 @@ let run () =
         |> get
       in
       let intent = Solana_transaction.Intent.derive message |> get in
-      Solana_transaction.Intent.validate_safe_sol_transfer intent |> get;
+      validate intent |> get;
       let signed =
         Solana_transaction.Transaction.create message
         |> Solana_transaction.Transaction.sign_with keypair |> get

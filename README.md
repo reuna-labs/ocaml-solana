@@ -2,9 +2,10 @@
 
 Pure OCaml Solana transaction construction, Ed25519 signing and typed JSON-RPC
 for signer-oriented clients. The first alpha supports legacy and v0 messages,
-System Program SOL transfers, compute-budget instructions and a Unix HTTP
-client. The offline packages are suitable for MirageOS consumers; a Mirage
-network adapter is a later milestone.
+System Program SOL transfers, checked SPL Token transfers, associated token
+accounts, compute-budget instructions and a Unix HTTP client. The offline
+packages are suitable for MirageOS consumers; a Mirage network adapter is a
+later milestone.
 
 > **Security:** this code is new, unaudited alpha software. Do not use it to
 > control assets of value.
@@ -42,13 +43,17 @@ The implemented launch slice is intentionally small and signer-oriented:
   lookup tables;
 - strict shortvec decoding and explicit rejection of unknown versions;
 - System Program SOL transfer and Compute Budget limit/price instructions;
+- canonical PDA/ATA derivation, idempotent ATA creation, and checked transfers
+  for the classic Token and Token-2022 program IDs;
 - 32-byte-seed Ed25519 signing, plus verified external-signature attachment;
 - reviewable intents derived from compiled message bytes;
 - typed HTTP JSON-RPC methods and a Unix Cohttp/Lwt adapter;
 - simulation, submission, commitment polling, and block-height expiry.
 
-SPL Token, associated token accounts, durable nonces, WebSocket subscriptions,
-and automatic lookup-table discovery are deliberately deferred.
+Token-2022 extension-aware account decoding, durable nonces, WebSocket
+subscriptions, and automatic lookup-table discovery are deliberately deferred.
+The safe token-transfer policy therefore rejects Token-2022 by default; opt in
+only after authenticating the mint account and reviewing its extensions.
 
 ### External signer flow
 
@@ -71,6 +76,13 @@ SOLANA_SEED_HEX=<64-hex-character-devnet-seed> \
 SOLANA_DESTINATION=<base58-address> \
 dune exec solana-devnet-transfer
 ```
+
+To exercise the token path, `SOLANA_DESTINATION` is the recipient owner rather
+than a token account. Set `SOLANA_TOKEN_MINT`, `SOLANA_TOKEN_AMOUNT` in base
+units, and `SOLANA_TOKEN_DECIMALS`; the smoke derives both ATAs, creates the
+recipient ATA idempotently, uses `TransferChecked`, reviews the compiled intent,
+then simulates before submission. `SOLANA_TOKEN_PROGRAM=token-2022` additionally
+requires `SOLANA_ALLOW_TOKEN_2022=1` after mint-extension review.
 
 Devnet can be reset. Override `SOLANA_EXPECTED_GENESIS_HASH` when a deliberate
 reset has been independently verified. Never use a production seed here.

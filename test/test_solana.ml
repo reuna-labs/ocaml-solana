@@ -2,6 +2,7 @@ let get = function Ok value -> value | Error message -> Alcotest.fail message
 let bytes byte length = String.make length (Char.chr byte)
 let address byte = get (Solana_types.Address.of_bytes (bytes byte 32))
 let hash byte = get (Solana_types.Hash.of_bytes (bytes byte 32))
+let address_of_base58 value = get (Solana_types.Address.of_base58 value)
 
 let hex value =
   let out = Bytes.create (String.length value * 2) in
@@ -12,6 +13,17 @@ let hex value =
       Bytes.set out ((index * 2) + 1) "0123456789abcdef".[value land 0xf])
     value;
   Bytes.unsafe_to_string out
+
+let unhex value =
+  let nibble = function
+    | '0' .. '9' as char -> Char.code char - Char.code '0'
+    | 'a' .. 'f' as char -> Char.code char - Char.code 'a' + 10
+    | 'A' .. 'F' as char -> Char.code char - Char.code 'A' + 10
+    | _ -> Alcotest.fail "invalid fixture hex"
+  in
+  if String.length value mod 2 <> 0 then Alcotest.fail "odd fixture hex length";
+  String.init (String.length value / 2) (fun index ->
+      Char.chr ((nibble value.[index * 2] lsl 4) lor nibble value.[(index * 2) + 1]))
 
 let transfer ~payer ~destination =
   Solana_transaction.Programs.transfer ~from:payer ~to_:destination
@@ -62,6 +74,201 @@ let v0_fixture () =
   Alcotest.(check string) "Agave-compatible v0 wire" expected actual;
   let intent = get (Solana_transaction.Intent.derive ~address_tables:[ table ] message) in
   get (Solana_transaction.Intent.validate_safe_sol_transfer intent)
+
+let kit_token_fixture () =
+  let open Yojson.Safe.Util in
+  let fixture = Yojson.Safe.from_file "../conformance/fixtures/kit-8.0.0-token.json" in
+  let addresses = fixture |> member "addresses" in
+  let address_field name = addresses |> member name |> to_string |> address_of_base58 in
+  let owner = address_field "owner" in
+  let recipient = address_field "recipient" in
+  let mint = address_field "mint" in
+  let expected_source = address_field "sourceAta" in
+  let expected_destination = address_field "destinationAta" in
+  let lookup_table = address_field "lookupTable" in
+  let source, source_bump =
+    get
+      (Solana_transaction.Programs.associated_token_address ~owner ~mint
+         ~token_program:Solana_transaction.Programs.Token)
+  in
+  let destination, destination_bump =
+    get
+      (Solana_transaction.Programs.associated_token_address ~owner:recipient ~mint
+         ~token_program:Solana_transaction.Programs.Token)
+  in
+  Alcotest.(check string) "source ATA"
+    (Solana_types.Address.to_base58 expected_source)
+    (Solana_types.Address.to_base58 source);
+  Alcotest.(check int) "source bump" (addresses |> member "sourceBump" |> to_int) source_bump;
+  Alcotest.(check string) "destination ATA"
+    (Solana_types.Address.to_base58 expected_destination)
+    (Solana_types.Address.to_base58 destination);
+  Alcotest.(check int) "destination bump"
+    (addresses |> member "destinationBump" |> to_int)
+    destination_bump;
+  let create_destination =
+    get
+      (Solana_transaction.Programs.create_associated_token_account_idempotent
+         ~payer:owner ~owner:recipient ~mint
+         ~token_program:Solana_transaction.Programs.Token)
+  in
+  let transfer_checked =
+    get
+      (Solana_transaction.Programs.transfer_checked ~source ~mint ~destination
+         ~authority:owner ~amount:(get (Solana_types.U64.of_int 1_234_567))
+         ~decimals:6 ~token_program:Solana_transaction.Programs.Token)
+  in
+  let blockhash = get (Solana_types.Hash.of_base58 (Solana_types.Address.to_base58 lookup_table)) in
+  let legacy =
+    get
+      (Solana_transaction.Message.compile_legacy ~payer:owner
+         ~recent_blockhash:blockhash [ create_destination; transfer_checked ])
+  in
+  let agave = Yojson.Safe.from_file "../conformance/fixtures/agave-4.2.1-token.json" in
+  Alcotest.(check string) "Agave legacy bytes"
+    (agave |> member "legacyAtaAndTransferCheckedHex" |> to_string)
+    (get (Solana_transaction.Message.encode legacy) |> hex);
+  let legacy_intent = get (Solana_transaction.Intent.derive legacy) in
+  get (Solana_transaction.Intent.validate_safe_token_transfer legacy_intent);
+  let kit_legacy =
+    fixture |> member "legacyAtaAndTransferChecked" |> member "hex" |> to_string
+    |> unhex |> Solana_transaction.Message.decode |> get
+  in
+  let kit_legacy_intent = get (Solana_transaction.Intent.derive kit_legacy) in
+  get (Solana_transaction.Intent.validate_safe_token_transfer kit_legacy_intent);
+  (match Solana_transaction.Intent.validate_safe_sol_transfer legacy_intent with
+  | Error _ -> ()
+  | Ok () -> Alcotest.fail "SOL policy accepted a token transfer");
+  let table : Solana_transaction.Message.address_table =
+    { key = lookup_table; addresses = [| mint; destination |] }
+  in
+  let v0 =
+    get
+      (Solana_transaction.Message.compile_v0 ~payer:owner ~recent_blockhash:blockhash
+         ~address_tables:[ table ] [ transfer_checked ])
+  in
+  Alcotest.(check string) "Agave v0 bytes"
+    (agave |> member "v0LookupTransferCheckedHex" |> to_string)
+    (get (Solana_transaction.Message.encode v0) |> hex);
+  let v0_intent =
+    get (Solana_transaction.Intent.derive ~address_tables:[ table ] v0)
+  in
+  get (Solana_transaction.Intent.validate_safe_token_transfer v0_intent);
+  let kit_v0 =
+    fixture |> member "v0LookupTransferChecked" |> member "hex" |> to_string
+    |> unhex |> Solana_transaction.Message.decode |> get
+  in
+  let kit_v0_intent =
+    get (Solana_transaction.Intent.derive ~address_tables:[ table ] kit_v0)
+  in
+  get (Solana_transaction.Intent.validate_safe_token_transfer kit_v0_intent)
+
+let token_policy_edges () =
+  let owner = address 1 in
+  let mint = address 2 in
+  let destination = address 3 in
+  let source = address 4 in
+  let token_2022 =
+    get
+      (Solana_transaction.Programs.transfer_checked ~source ~mint ~destination
+         ~authority:owner ~amount:(get (Solana_types.U64.of_int 1)) ~decimals:6
+         ~token_program:Solana_transaction.Programs.Token_2022)
+  in
+  let message =
+    get
+      (Solana_transaction.Message.compile_legacy ~payer:owner ~recent_blockhash:(hash 5)
+         [ token_2022 ])
+  in
+  let intent = get (Solana_transaction.Intent.derive message) in
+  (match Solana_transaction.Intent.validate_safe_token_transfer intent with
+  | Error _ -> ()
+  | Ok () -> Alcotest.fail "Token-2022 policy must require explicit opt-in");
+  get
+    (Solana_transaction.Intent.validate_safe_token_transfer ~allow_token_2022:true
+       intent);
+  let bad_ata =
+    Solana_types.instruction
+      ~program:Solana_transaction.Programs.associated_token_program
+      ~accounts:
+        [ Solana_types.account_meta ~signer:true ~writable:true owner;
+          Solana_types.account_meta ~writable:true destination;
+          Solana_types.account_meta owner;
+          Solana_types.account_meta mint;
+          Solana_types.account_meta Solana_transaction.Programs.system_program;
+          Solana_types.account_meta
+            (Solana_transaction.Programs.token_program_address
+               Solana_transaction.Programs.Token) ]
+      ~data:"\001"
+  in
+  let classic =
+    get
+      (Solana_transaction.Programs.transfer_checked ~source ~mint ~destination
+         ~authority:owner ~amount:(get (Solana_types.U64.of_int 1)) ~decimals:6
+         ~token_program:Solana_transaction.Programs.Token)
+  in
+  let malicious =
+    get
+      (Solana_transaction.Message.compile_legacy ~payer:owner ~recent_blockhash:(hash 5)
+         [ bad_ata; classic ])
+    |> Solana_transaction.Intent.derive |> get
+  in
+  match Solana_transaction.Intent.validate_safe_token_transfer malicious with
+  | Error _ -> ()
+  | Ok () -> Alcotest.fail "policy accepted an ATA with the wrong derived address"
+
+let pda_limits () =
+  match
+    Solana_crypto.create_program_address ~seeds:[ String.make 33 'x' ]
+      ~program:(address 1)
+  with
+  | Error _ -> ()
+  | Ok _ -> Alcotest.fail "PDA accepted an oversized seed"
+
+let lookup_table_policy () =
+  let payer = address 1 in
+  let program = address 8 in
+  let intended = address 9 in
+  let attacker = address 10 in
+  let table_key = address 4 in
+  let instruction =
+    Solana_types.instruction ~program
+      ~accounts:[ Solana_types.account_meta ~writable:true intended ]
+      ~data:"arbitrary-program-payload"
+  in
+  let trusted_table : Solana_transaction.Message.address_table =
+    { key = table_key; addresses = [| intended |] }
+  in
+  let message =
+    get
+      (Solana_transaction.Message.compile_v0 ~payer ~recent_blockhash:(hash 2)
+         ~address_tables:[ trusted_table ] [ instruction ])
+  in
+  let resolved_destination table =
+    let intent =
+      get (Solana_transaction.Intent.derive ~address_tables:[ table ] message)
+    in
+    (match intent.instructions with
+    | [ Solana_transaction.Intent.Opaque { program = actual_program; accounts = [ account ]; _ } ] ->
+      Alcotest.(check string) "arbitrary program"
+        (Solana_types.Address.to_base58 program)
+        (Solana_types.Address.to_base58 actual_program);
+      (match Solana_transaction.Intent.validate_safe_sol_transfer intent with
+      | Error _ -> ()
+      | Ok () -> Alcotest.fail "SOL policy accepted an arbitrary program");
+      account
+    | _ -> Alcotest.fail "arbitrary instruction was not represented as opaque")
+  in
+  let trusted = resolved_destination trusted_table in
+  Alcotest.(check string) "trusted lookup value"
+    (Solana_types.Address.to_base58 intended)
+    (Solana_types.Address.to_base58 trusted);
+  let malicious_table : Solana_transaction.Message.address_table =
+    { key = table_key; addresses = [| attacker |] }
+  in
+  let substituted = resolved_destination malicious_table in
+  Alcotest.(check string) "malicious lookup substitution is visible in intent"
+    (Solana_types.Address.to_base58 attacker)
+    (Solana_types.Address.to_base58 substituted)
 
 let version_rejection () =
   match Solana_transaction.Message.decode "\x81" with
@@ -145,7 +352,9 @@ let confirmation () =
 
 let () =
   Alcotest.run "ocaml-solana"
-    [ "wire", [ Alcotest.test_case "legacy golden" `Quick legacy_fixture; Alcotest.test_case "v0 golden" `Quick v0_fixture; Alcotest.test_case "reject v1" `Quick version_rejection ];
+    [ "wire", [ Alcotest.test_case "legacy golden" `Quick legacy_fixture; Alcotest.test_case "v0 golden" `Quick v0_fixture; Alcotest.test_case "Kit token vectors" `Quick kit_token_fixture; Alcotest.test_case "reject v1" `Quick version_rejection ];
+      "token", [ Alcotest.test_case "policy edges" `Quick token_policy_edges; Alcotest.test_case "PDA limits" `Quick pda_limits ];
+      "policy", [ Alcotest.test_case "lookup-table substitution" `Quick lookup_table_policy ];
       "shortvec", [ Alcotest.test_case "boundary vectors" `Quick shortvec_vectors; QCheck_alcotest.to_alcotest shortvec_property ];
       "signing", [ Alcotest.test_case "Ed25519 transaction" `Quick signing ];
       "rpc", [ Alcotest.test_case "decode latest blockhash" `Quick rpc_decode; Alcotest.test_case "confirmation state" `Quick confirmation ] ]

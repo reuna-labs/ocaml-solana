@@ -30,3 +30,32 @@ let verify ~address ~signature message =
   match E.pub_of_octets (Solana_types.Address.to_bytes address) with
   | Error _ -> false
   | Ok key -> E.verify ~key (Solana_types.Signature.to_bytes signature) ~msg:message
+
+let create_program_address ~seeds ~program =
+  if List.length seeds > 16 then Error "program address: more than 16 seeds"
+  else
+    match List.find_opt (fun seed -> String.length seed > 32) seeds with
+    | Some _ -> Error "program address: seed exceeds 32 bytes"
+    | None ->
+      let payload =
+        String.concat ""
+          (seeds
+          @ [ Solana_types.Address.to_bytes program; "ProgramDerivedAddress" ])
+      in
+      let digest = Digestif.SHA256.digest_string payload |> Digestif.SHA256.to_raw_string in
+      (match E.pub_of_octets digest with
+      | Ok _ -> Error "program address: derived address is on the Ed25519 curve"
+      | Error _ -> Solana_types.Address.of_bytes digest)
+
+let find_program_address ~seeds ~program =
+  if List.length seeds > 15 then Error "program address: more than 15 caller seeds"
+  else
+    let rec search bump =
+      if bump < 0 then Error "program address: no viable bump seed"
+      else
+        match create_program_address ~seeds:(seeds @ [ String.make 1 (Char.chr bump) ]) ~program with
+        | Ok address -> Ok (address, bump)
+        | Error "program address: derived address is on the Ed25519 curve" -> search (bump - 1)
+        | Error _ as error -> error
+    in
+    search 255

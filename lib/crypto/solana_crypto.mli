@@ -14,3 +14,17 @@ val verify :
   signature:Solana_types.Signature.t ->
   string ->
   bool
+
+(** Derives a Solana program address. Each seed is at most 32 bytes and there
+    may be at most 16. An on-curve digest is rejected. *)
+val create_program_address :
+  seeds:string list ->
+  program:Solana_types.Address.t ->
+  (Solana_types.Address.t, string) result
+
+(** Searches bump seeds from 255 down to 0. Callers may provide at most 15
+    seeds because the bump occupies the final seed slot. *)
+val find_program_address :
+  seeds:string list ->
+  program:Solana_types.Address.t ->
+  ((Solana_types.Address.t * int), string) result

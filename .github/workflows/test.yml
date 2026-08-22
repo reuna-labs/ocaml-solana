@@ -3,6 +3,26 @@ name: test
 on: [push, pull_request]
 
 jobs:
+  sdk-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: conformance/kit/package-lock.json
+      - run: npm ci --prefix conformance/kit
+      - name: Regenerate Kit 8.0.0 fixtures
+        run: |
+          node conformance/kit/generate.mjs > /tmp/kit-token.json
+          diff -u conformance/fixtures/kit-8.0.0-token.json /tmp/kit-token.json
+      - uses: dtolnay/rust-toolchain@1.89.0
+      - name: Regenerate Agave 4.2.1 fixtures
+        run: |
+          cargo run --locked --quiet --manifest-path conformance/agave/Cargo.toml > /tmp/agave-token.json
+          diff -u conformance/fixtures/agave-4.2.1-token.json /tmp/agave-token.json
+
   build:
     strategy:
       fail-fast: false
