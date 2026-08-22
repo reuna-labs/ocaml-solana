@@ -1,0 +1,40 @@
+name: test
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        ocaml-compiler: ["4.14.2", "5.2.1"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out private lean codec packages
+        uses: actions/checkout@v4
+        with:
+          repository: reuna-labs/ocaml-web3-codec
+          token: ${{ secrets.REUNA_REPO_READ_TOKEN }}
+          path: ocaml-web3-codec
+          ref: 13be69c3071a1e66996cc7c64e52366b9bf4ce0e
+
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          opam-local-packages: "*.opam"
+
+      - name: Pin lean codecs
+        run: |
+          opam pin add -yn web3-codec-basen ./ocaml-web3-codec
+          opam pin add -yn web3-codec-base58 ./ocaml-web3-codec
+          opam pin add -yn web3-codec-borsh ./ocaml-web3-codec
+
+      - run: opam install -y --deps-only --with-test .
+      - run: opam exec -- dune build @all
+      - run: opam exec -- dune runtest
+
+      - name: Prove the offline core links without Unix RPC
+        run: opam exec -- dune build mirage-smoke/smoke.exe

@@ -1,0 +1,13 @@
+(test
+ (name test_solana)
+ (package solana)
+ (libraries
+  solana-types
+  solana-crypto
+  solana-transaction
+  solana-rpc
+  alcotest
+  qcheck-core
+  qcheck-alcotest
+  yojson
+  zarith))

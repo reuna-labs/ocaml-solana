@@ -1,0 +1,35 @@
+name: devnet smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  transfer:
+    runs-on: ubuntu-latest
+    environment: devnet
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: reuna-labs/ocaml-web3-codec
+          token: ${{ secrets.REUNA_REPO_READ_TOKEN }}
+          path: ocaml-web3-codec
+          ref: 13be69c3071a1e66996cc7c64e52366b9bf4ce0e
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "5.2.1"
+          opam-local-packages: "*.opam"
+      - name: Pin lean codecs
+        run: |
+          opam pin add -yn web3-codec-basen ./ocaml-web3-codec
+          opam pin add -yn web3-codec-base58 ./ocaml-web3-codec
+          opam pin add -yn web3-codec-borsh ./ocaml-web3-codec
+      - run: opam install -y --deps-only .
+      - name: Simulate, submit, and confirm a small Devnet transfer
+        env:
+          SOLANA_ENABLE_NETWORK_TESTS: "1"
+          SOLANA_SEED_HEX: ${{ secrets.SOLANA_DEVNET_SEED_HEX }}
+          SOLANA_DESTINATION: ${{ vars.SOLANA_DEVNET_DESTINATION }}
+          SOLANA_EXPECTED_GENESIS_HASH: ${{ vars.SOLANA_DEVNET_GENESIS_HASH }}
+          SOLANA_LAMPORTS: "5000"
+        run: opam exec -- dune exec solana-devnet-transfer

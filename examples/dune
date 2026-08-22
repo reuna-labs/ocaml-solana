@@ -1,0 +1,14 @@
+(executable
+ (name devnet_transfer)
+ (package solana-rpc-unix)
+ (public_name solana-devnet-transfer)
+ (libraries
+  solana-types
+  solana-crypto
+  solana-transaction
+  solana-rpc
+  solana-rpc-unix
+  lwt
+  lwt.unix
+  uri
+  yojson))

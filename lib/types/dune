@@ -1,0 +1,4 @@
+(library
+ (name solana_types)
+ (public_name solana-types)
+ (libraries zarith web3-codec-base58))

@@ -1,0 +1,4 @@
+(library
+ (name solana_rpc_cohttp)
+ (public_name solana-rpc-cohttp)
+ (libraries solana-rpc lwt uri http cohttp-lwt))

@@ -1,0 +1,9 @@
+(library
+ (name solana_transaction)
+ (public_name solana-transaction)
+ (libraries
+  solana-types
+  solana-crypto
+  web3-codec-borsh
+  digestif
+  zarith))

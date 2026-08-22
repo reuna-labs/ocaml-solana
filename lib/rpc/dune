@@ -1,0 +1,4 @@
+(library
+ (name solana_rpc)
+ (public_name solana-rpc)
+ (libraries solana-types solana-transaction yojson base64 zarith))

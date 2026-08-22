@@ -1,0 +1,4 @@
+(executable
+ (name smoke)
+ (modules smoke)
+ (libraries solana-types solana-transaction))

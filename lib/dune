@@ -1,0 +1,4 @@
+(library
+ (name solana)
+ (public_name solana)
+ (libraries solana-types solana-crypto solana-transaction solana-rpc))
