@@ -13,14 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check out private lean codec packages
-        uses: actions/checkout@v4
-        with:
-          repository: reuna-labs/ocaml-web3-codec
-          token: ${{ secrets.REUNA_REPO_READ_TOKEN }}
-          path: ocaml-web3-codec
-          ref: 13be69c3071a1e66996cc7c64e52366b9bf4ce0e
-
       - uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
@@ -28,9 +20,9 @@ jobs:
 
       - name: Pin lean codecs
         run: |
-          opam pin add -yn web3-codec-basen ./ocaml-web3-codec
-          opam pin add -yn web3-codec-base58 ./ocaml-web3-codec
-          opam pin add -yn web3-codec-borsh ./ocaml-web3-codec
+          opam pin add -yn web3-codec-basen ./vendor/web3-codec
+          opam pin add -yn web3-codec-base58 ./vendor/web3-codec
+          opam pin add -yn web3-codec-borsh ./vendor/web3-codec
 
       - run: opam install -y --deps-only --with-test .
       - run: opam exec -- dune build @all

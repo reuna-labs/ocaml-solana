@@ -79,6 +79,6 @@ clock, environment, RNG, HTTP, or Lwt dependency. `solana-rpc` is
 transport-independent. Unix dependencies exist only in `solana-rpc-cohttp` and
 `solana-rpc-unix`. The `mirage-smoke` link check guards that boundary.
 
-CI needs a repository read token named `REUNA_REPO_READ_TOKEN` because the
-three lean codec packages currently live in the private
-`reuna-labs/ocaml-web3-codec` repository.
+The three lean codec packages are vendored at their pinned commit so clean CI
+does not need cross-repository credentials. Their canonical development source
+remains the private `reuna-labs/ocaml-web3-codec` repository.

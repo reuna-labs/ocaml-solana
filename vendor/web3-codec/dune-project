@@ -1,0 +1,17 @@
+(lang dune 3.0)
+(name web3-codec-solana-vendor)
+(version 0.1.0~alpha1)
+(generate_opam_files false)
+(implicit_transitive_deps false)
+
+(package
+ (name web3-codec-basen)
+ (allow_empty))
+
+(package
+ (name web3-codec-base58)
+ (allow_empty))
+
+(package
+ (name web3-codec-borsh)
+ (allow_empty))
