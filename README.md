@@ -19,14 +19,17 @@ rejected as unsupported.
 
 ## Build
 
-Pin the lean codec packages from `../ocaml-web3-codec`, then install the local
-packages and run:
+Pin the credential-free vendored codec snapshot, install dependencies, and run:
 
 ```sh
-dune runtest
+opam pin add -yn web3-codec-basen ./vendor/web3-codec
+opam pin add -yn web3-codec-base58 ./vendor/web3-codec
+opam pin add -yn web3-codec-borsh ./vendor/web3-codec
+opam install -y --deps-only --with-test .
+opam exec -- dune build @all @runtest
 ```
 
-CI pins codec commit `13be69c3071a1e66996cc7c64e52366b9bf4ce0e`.
+The snapshot pins codec commit `13be69c3071a1e66996cc7c64e52366b9bf4ce0e`.
 
 The normal tests do not access a network. Set `SOLANA_ENABLE_NETWORK_TESTS=1`
 only when deliberately running the Devnet smoke executable.
