@@ -16,7 +16,8 @@ let fail_unless condition exception_ =
 
 let handshake request input output nonce =
   let open Cohttp in
-  Framing.Request.write (fun _writer -> Lwt.return_unit) request output
+  Framing.Request.write ~flush:true (fun _writer -> Lwt.return_unit) request
+    output
   >>= fun () ->
   Framing.Response.read input >>= function
   | `Eof -> Lwt.fail End_of_file
