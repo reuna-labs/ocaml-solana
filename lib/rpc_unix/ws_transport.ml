@@ -1,6 +1,6 @@
 open Lwt.Infix
 
-module Framing = Websocket.Make (Cohttp_lwt_unix.IO)
+module Framing = Websocket.Make (Cohttp_lwt_unix.Private.IO)
 
 type t = {
   read_frame : unit -> Websocket.Frame.t Lwt.t;
