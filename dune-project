@@ -98,6 +98,7 @@
   (lwt (>= 5.6.0))
   http-mirage-client
   h1
+  h2
   mimic))
 
 (package
