@@ -36,6 +36,7 @@ jobs:
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           opam-local-packages: "*.opam"
+          opam-disable-sandboxing: true
 
       - name: Pin lean codecs
         run: |
