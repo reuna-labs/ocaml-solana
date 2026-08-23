@@ -67,7 +67,8 @@ jobs:
           opam pin add -yn web3-codec-base58 ./vendor/web3-codec
           opam pin add -yn web3-codec-borsh ./vendor/web3-codec
 
-      - run: opam install -y --deps-only --with-test .
+      - name: Install dependencies against the private GMP prefix
+        run: opam install -y --assume-depexts --deps-only --with-test .
       - run: opam exec -- dune build @all
       - run: opam exec -- dune runtest
 
