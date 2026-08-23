@@ -29,12 +29,6 @@ jobs:
       matrix:
         ocaml-compiler: ["4.14.2", "5.2.1"]
     runs-on: [self-hosted, Linux, X64, reuna-builder-x86]
-    env:
-      GMP_PREFIX: ${{ runner.temp }}/ocaml-solana-gmp-${{ matrix.ocaml-compiler }}
-      CPATH: ${{ runner.temp }}/ocaml-solana-gmp-${{ matrix.ocaml-compiler }}/include
-      LIBRARY_PATH: ${{ runner.temp }}/ocaml-solana-gmp-${{ matrix.ocaml-compiler }}/lib
-      LD_LIBRARY_PATH: ${{ runner.temp }}/ocaml-solana-gmp-${{ matrix.ocaml-compiler }}/lib
-      PKG_CONFIG_PATH: ${{ runner.temp }}/ocaml-solana-gmp-${{ matrix.ocaml-compiler }}/lib/pkgconfig
     steps:
       - uses: actions/checkout@v4
 
@@ -51,15 +45,20 @@ jobs:
         run: |
           archive="$RUNNER_TEMP/gmp-$GMP_VERSION.tar.xz"
           source_dir="$RUNNER_TEMP/gmp-$GMP_VERSION"
+          gmp_prefix="$RUNNER_TEMP/ocaml-solana-gmp-${{ matrix.ocaml-compiler }}"
           curl --fail --location --output "$archive" \
             "https://gmplib.org/download/gmp/gmp-$GMP_VERSION.tar.xz"
           echo "$GMP_SHA256  $archive" | sha256sum --check --strict
           tar --extract --xz --file "$archive" --directory "$RUNNER_TEMP"
           cd "$source_dir"
-          ./configure --prefix="$GMP_PREFIX" --with-pic
+          ./configure --prefix="$gmp_prefix" --with-pic
           make -j"$(nproc)"
           make check
           make install
+          echo "CPATH=$gmp_prefix/include" >> "$GITHUB_ENV"
+          echo "LIBRARY_PATH=$gmp_prefix/lib" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$gmp_prefix/lib" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$gmp_prefix/lib/pkgconfig" >> "$GITHUB_ENV"
 
       - name: Pin lean codecs
         run: |
