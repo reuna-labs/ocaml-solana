@@ -34,10 +34,10 @@ module Websocket = struct
     >>= fun endpoint ->
     let ctx = Lazy.force Conduit_lwt_unix.default_ctx in
     Conduit_lwt_unix.endp_to_client ~ctx endpoint >>= fun client ->
-    Websocket_lwt_unix.connect ~ctx client uri
+    Ws_transport.connect ~ctx client uri
 
   let send connection (command : Solana_rpc.Subscriptions.command) =
-    Websocket_lwt_unix.write connection
+    Ws_transport.write connection
       (Websocket.Frame.create ~opcode:Websocket.Frame.Opcode.Text
          ~content:command.text ())
 
@@ -49,17 +49,17 @@ module Websocket = struct
   let receive_text connection =
     let buffer = Buffer.create 256 in
     let rec loop fragmented =
-      Lwt.bind (Websocket_lwt_unix.read connection) (fun frame ->
+      Lwt.bind (Ws_transport.read connection) (fun frame ->
         match frame.Websocket.Frame.opcode with
         | Ping ->
           Lwt.bind
-            (Websocket_lwt_unix.write connection
+            (Ws_transport.write connection
                (Websocket.Frame.create ~opcode:Pong ~content:frame.content ()))
             (fun () -> loop fragmented)
         | Pong -> loop fragmented
         | Close ->
           Lwt.bind
-            (Websocket_lwt_unix.write connection
+            (Ws_transport.write connection
                (Websocket.Frame.create ~opcode:Close ()))
             (fun () -> Lwt.fail End_of_file)
         | Text when fragmented ->
@@ -117,7 +117,7 @@ module Websocket = struct
               current_state := state;
               let rec receive () =
                 Lwt.bind (with_stop stop (receive_text established)) (function
-                  | Stop -> Websocket_lwt_unix.close_transport established
+                  | Stop -> Ws_transport.close established
                   | Continue text ->
                     (match
                        Solana_rpc.Subscriptions.receive !current_state text
@@ -135,7 +135,7 @@ module Websocket = struct
             | None -> Lwt.return_unit
             | Some connection ->
               Lwt.catch
-                (fun () -> Websocket_lwt_unix.close_transport connection)
+                (fun () -> Ws_transport.close connection)
                 (fun _ -> Lwt.return_unit)
           in
           let state = Solana_rpc.Subscriptions.disconnected !current_state in

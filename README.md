@@ -4,8 +4,8 @@ Pure OCaml Solana transaction construction, Ed25519 signing and typed JSON-RPC
 for signer-oriented clients. The first alpha supports legacy and v0 messages,
 System Program SOL transfers, checked SPL Token transfers, associated token
 accounts, compute-budget instructions and a Unix HTTP client. The offline
-packages are suitable for MirageOS consumers; a Mirage network adapter is a
-later milestone.
+packages are suitable for MirageOS consumers; HTTP/TLS also has a native
+MirageOS adapter.
 
 > **Security:** this code is new, unaudited alpha software. Do not use it to
 > control assets of value.
@@ -47,11 +47,15 @@ The implemented launch slice is intentionally small and signer-oriented:
   for the classic Token and Token-2022 program IDs;
 - 32-byte-seed Ed25519 signing, plus verified external-signature attachment;
 - reviewable intents derived from compiled message bytes;
-- typed HTTP JSON-RPC methods and a Unix Cohttp/Lwt adapter;
-- simulation, submission, commitment polling, and block-height expiry.
+- typed JSON-RPC methods, bounded streaming HTTP responses, Unix Cohttp/Lwt,
+  and MirageOS ALPN HTTP/TLS adapters;
+- deterministic simulation/submission/confirmation state with stale-blockhash
+  refresh, re-signing, polling deadlines, and block-height expiry;
+- signature and account WebSocket subscriptions on Unix, with automatic
+  reconnect and fresh server-side subscription identifiers.
 
-Token-2022 extension-aware account decoding, durable nonces, WebSocket
-subscriptions, and automatic lookup-table discovery are deliberately deferred.
+Token-2022 extension-aware account decoding, durable nonces, WebSocket support
+inside MirageOS, and automatic lookup-table discovery are deliberately deferred.
 The safe token-transfer policy therefore rejects Token-2022 by default; opt in
 only after authenticating the mint account and reviewing its extensions.
 
@@ -66,9 +70,11 @@ enforces Solana's 1,232-byte legacy/v0 wire limit.
 ### Devnet smoke
 
 The installed `solana-devnet-transfer` executable is inert unless explicitly
-enabled. It verifies the RPC genesis hash before requesting a blockhash, derives
-and checks the intent, signs locally, simulates, sends, and waits for confirmed
-commitment or expiry.
+enabled. It verifies the RPC genesis hash, derives and checks the intent, signs
+locally, simulates, sends, and waits for confirmed commitment. If simulation,
+submission, or confirmation proves the blockhash stale, it fetches a fresh
+blockhash and rebuilds, reviews, and re-signs the transaction; attempts and
+confirmation polls are bounded.
 
 ```sh
 SOLANA_ENABLE_NETWORK_TESTS=1 \
@@ -91,8 +97,11 @@ reset has been independently verified. Never use a production seed here.
 
 `solana-types`, `solana-crypto`, and `solana-transaction` contain no Unix,
 clock, environment, RNG, HTTP, or Lwt dependency. `solana-rpc` is
-transport-independent. Unix dependencies exist only in `solana-rpc-cohttp` and
-`solana-rpc-unix`. The `mirage-smoke` link check guards that boundary.
+transport-independent and owns the deterministic submission and subscription
+state. Unix dependencies exist only in `solana-rpc-unix`; the reusable Cohttp
+streaming adapter is in `solana-rpc-cohttp`, and `solana-rpc-mirage` targets the
+MirageOS ALPN client. The `mirage-smoke` executables link the same submission
+workflow and the Mirage adapter without the Unix RPC package.
 
 The three lean codec packages are vendored at their pinned commit so clean CI
 does not need cross-repository credentials. Their canonical development source

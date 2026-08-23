@@ -72,5 +72,8 @@ jobs:
       - run: opam exec -- dune build @all
       - run: opam exec -- dune runtest
 
-      - name: Prove the offline core links without Unix RPC
-        run: opam exec -- dune build mirage-smoke/smoke.exe
+      - name: Prove the shared workflow links through Mirage without Unix RPC
+        run: >-
+          opam exec -- dune build
+          mirage-smoke/smoke.exe
+          mirage-smoke/unikernel.exe

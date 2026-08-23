@@ -10,7 +10,7 @@
   http
   cohttp-lwt
   cohttp-lwt-unix
+  base64
   conduit-lwt
   conduit-lwt-unix
-  websocket
-  websocket-lwt-unix))
+  websocket))

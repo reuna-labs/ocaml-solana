@@ -81,10 +81,10 @@
   (http (>= 6.1.0))
   (cohttp-lwt (>= 6.1.0))
   (cohttp-lwt-unix (>= 6.1.0))
+  (base64 (>= 3.3.0))
   conduit-lwt
   conduit-lwt-unix
-  websocket
-  websocket-lwt-unix))
+  websocket))
 
 (package
  (name solana-rpc-mirage)

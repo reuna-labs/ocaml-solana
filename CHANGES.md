@@ -13,3 +13,7 @@
   regenerable Kit 8.0.0 / Agave 4.2.1 conformance fixtures.
 - Add typed transport-independent JSON-RPC, Unix Cohttp, confirmation expiry,
   an opt-in Devnet transfer smoke, golden fixtures, and Mirage-safe link checks.
+- Add a deterministic stale-blockhash refresh/re-sign and confirmation-deadline
+  state machine, and use it in the Devnet submission flow.
+- Add signature/account WebSocket subscriptions with Unix reconnect, bounded
+  streaming Cohttp responses, and a native MirageOS ALPN HTTP/TLS adapter.
