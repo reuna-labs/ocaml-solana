@@ -27,16 +27,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ocaml-compiler: ["4.14.2", "5.2.1"]
+        include:
+          - ocaml-compiler: "4.14.2"
+            container-tag: ubuntu-24.04-ocaml-4.14
+          - ocaml-compiler: "5.2.1"
+            container-tag: ubuntu-24.04-ocaml-5.2
     runs-on: [self-hosted, Linux, X64, reuna-builder-x86]
+    container:
+      image: ocaml/opam:${{ matrix.container-tag }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ocaml/setup-ocaml@v3
-        with:
-          ocaml-compiler: ${{ matrix.ocaml-compiler }}
-          opam-local-packages: "*.opam"
-          opam-disable-sandboxing: true
+      - name: Verify the compiler image
+        run: test "$(ocamlc -version)" = "${{ matrix.ocaml-compiler }}"
 
       - name: Pin lean codecs
         run: |
