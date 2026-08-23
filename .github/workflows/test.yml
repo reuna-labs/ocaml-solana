@@ -46,8 +46,9 @@ jobs:
           archive="$RUNNER_TEMP/gmp-$GMP_VERSION.tar.xz"
           source_dir="$RUNNER_TEMP/gmp-$GMP_VERSION"
           gmp_prefix="$RUNNER_TEMP/ocaml-solana-gmp-${{ matrix.ocaml-compiler }}"
-          curl --fail --location --output "$archive" \
-            "https://gmplib.org/download/gmp/gmp-$GMP_VERSION.tar.xz"
+          curl --fail --location --retry 5 --retry-all-errors \
+            --connect-timeout 20 --output "$archive" \
+            "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_VERSION.tar.xz"
           echo "$GMP_SHA256  $archive" | sha256sum --check --strict
           tar --extract --xz --file "$archive" --directory "$RUNNER_TEMP"
           cd "$source_dir"
