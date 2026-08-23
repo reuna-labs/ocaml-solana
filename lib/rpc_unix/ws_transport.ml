@@ -77,7 +77,7 @@ let connect ?(extra_headers = Cohttp.Header.init ())
       Lwt.fail exception_)
   >|= fun () ->
   let read_frame =
-    Framing.make_read_frame ~mode:(Websocket.Client random_string) input output
+    Framing.make_read_frame ~mode:(Framing.Client random_string) input output
   in
   let read_frame () =
     Lwt.catch read_frame (fun exception_ ->
@@ -88,7 +88,7 @@ let connect ?(extra_headers = Cohttp.Header.init ())
   let write_frame frame =
     Buffer.clear buffer;
     Lwt.wrap2
-      (Framing.write_frame_to_buf ~mode:(Websocket.Client random_string))
+      (Framing.write_frame_to_buf ~mode:(Framing.Client random_string))
       buffer frame
     >>= fun () ->
     Lwt.catch
