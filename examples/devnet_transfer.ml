@@ -25,23 +25,65 @@ let required_env name =
 
 let get = function Ok value -> value | Error message -> invalid_arg message
 
-let wait_for_confirmation transport ~signature ~last_valid_block_height =
-  let rec loop () =
-    let* statuses =
-      call transport (Solana_rpc.Methods.get_signature_statuses [ signature ])
-    in
-    let* height = call transport (Solana_rpc.Methods.get_block_height ()) in
-    let status = match statuses.value with [ status ] -> status | _ -> None in
-    match
-      Solana_rpc.Confirmation.decide ~commitment:Solana_types.Confirmed
-        ~current_block_height:height ~last_valid_block_height status
-    with
-    | Solana_rpc.Confirmation.Succeeded -> Lwt.return_unit
-    | Failed error -> fail ("transaction failed: " ^ Yojson.Safe.to_string error)
-    | Expired -> fail "transaction expired before reaching confirmed commitment"
-    | Pending -> let* () = Lwt_unix.sleep 0.5 in loop ()
+let run_submission transport ~keypair ~payer ~instructions ~validate =
+  let config =
+    Solana_rpc.Submission.config ~max_attempts:3 ~max_confirmation_polls:240
+      ~commitment:Solana_types.Confirmed
+    |> get
   in
-  loop ()
+  let rec drive state =
+    let open Solana_rpc.Submission in
+    let continue event =
+      match advance state event with
+      | Error message -> fail message
+      | Ok state -> drive state
+    in
+    let rpc method_ success =
+      let* result = Solana_rpc_unix.Client.call transport method_ in
+      match result with
+      | Ok value -> continue (success value)
+      | Error error -> continue (Rpc_error error)
+    in
+    match action state with
+    | Fetch_latest_blockhash ->
+      rpc (Solana_rpc.Methods.get_latest_blockhash ()) (fun value ->
+          Latest_blockhash value)
+    | Sign latest ->
+      let message =
+        Solana_transaction.Message.compile_legacy ~payer
+          ~recent_blockhash:latest.blockhash instructions
+        |> get
+      in
+      let intent = Solana_transaction.Intent.derive message |> get in
+      validate intent |> get;
+      let transaction =
+        Solana_transaction.Transaction.create message
+        |> Solana_transaction.Transaction.sign_with keypair |> get
+        |> Solana_transaction.Transaction.finalize |> get
+      in
+      continue (Signed transaction)
+    | Simulate transaction ->
+      let wire = Solana_transaction.Transaction.encode transaction in
+      rpc
+        (Solana_rpc.Methods.simulate_transaction ~sig_verify:true wire)
+        (fun value -> Simulation value)
+    | Submit transaction ->
+      rpc (Solana_rpc.Methods.send_transaction transaction) (fun value ->
+          Submitted value)
+    | Check_signature signature ->
+      rpc (Solana_rpc.Methods.get_signature_statuses [ signature ]) (fun value ->
+          Signature_statuses value)
+    | Check_block_height ->
+      rpc (Solana_rpc.Methods.get_block_height ()) (fun value ->
+          Block_height value)
+    | Wait ->
+      let* () = Lwt_unix.sleep 0.5 in
+      continue Waited
+    | Finished (Confirmed signature) -> Lwt.return signature
+    | Finished (Failed failure) ->
+      fail (Format.asprintf "%a" Solana_rpc.Submission.pp_failure failure)
+  in
+  drive (Solana_rpc.Submission.start config)
 
 let run () =
   if Sys.getenv_opt "SOLANA_ENABLE_NETWORK_TESTS" <> Some "1" then (
@@ -71,7 +113,6 @@ let run () =
            (Solana_types.Hash.to_base58 expected_genesis)
            (Solana_types.Hash.to_base58 actual_genesis))
     else
-      let* latest = call transport (Solana_rpc.Methods.get_latest_blockhash ()) in
       let payer = Solana_crypto.address keypair in
       let instructions, validate =
         match Sys.getenv_opt "SOLANA_TOKEN_MINT" with
@@ -124,35 +165,11 @@ let run () =
             Solana_transaction.Intent.validate_safe_token_transfer
               ~allow_token_2022 )
       in
-      let message =
-        Solana_transaction.Message.compile_legacy ~payer
-          ~recent_blockhash:latest.value.blockhash instructions
-        |> get
+      let* submitted =
+        run_submission transport ~keypair ~payer ~instructions ~validate
       in
-      let intent = Solana_transaction.Intent.derive message |> get in
-      validate intent |> get;
-      let signed =
-        Solana_transaction.Transaction.create message
-        |> Solana_transaction.Transaction.sign_with keypair |> get
-        |> Solana_transaction.Transaction.finalize |> get
-      in
-      let wire = Solana_transaction.Transaction.encode signed in
-      let* simulation =
-        call transport (Solana_rpc.Methods.simulate_transaction ~sig_verify:true wire)
-      in
-      (match simulation.value.err with
-      | Some error -> fail ("simulation failed: " ^ Yojson.Safe.to_string error)
-      | None ->
-        let* submitted = call transport (Solana_rpc.Methods.send_transaction signed) in
-        let local_id = Solana_transaction.Transaction.id signed in
-        if not (Solana_types.Signature.equal submitted local_id) then
-          fail "RPC returned a transaction signature different from the locally signed ID"
-        else
-          let* () =
-            wait_for_confirmation transport ~signature:submitted
-              ~last_valid_block_height:latest.value.last_valid_block_height
-          in
-          Printf.printf "confirmed %s\n%!" (Solana_types.Signature.to_base58 submitted);
-          Lwt.return_unit)
+      Printf.printf "confirmed %s\n%!"
+        (Solana_types.Signature.to_base58 submitted);
+      Lwt.return_unit
 
 let () = Lwt_main.run (run ())

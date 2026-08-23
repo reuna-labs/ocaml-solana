@@ -350,6 +350,185 @@ let confirmation () =
   in
   match decision with Solana_rpc.Confirmation.Succeeded -> () | _ -> Alcotest.fail "expected confirmation"
 
+let context value : _ Solana_rpc.Methods.contextual =
+  { context = { slot = get (Solana_types.U64.of_int 1); api_version = None };
+    value }
+
+let signed_transfer keypair recent_blockhash =
+  let payer = Solana_crypto.address keypair in
+  Solana_transaction.Message.compile_legacy ~payer ~recent_blockhash
+    [ transfer ~payer ~destination:(address 3) ]
+  |> get |> Solana_transaction.Transaction.create
+  |> Solana_transaction.Transaction.sign_with keypair |> get
+  |> Solana_transaction.Transaction.finalize |> get
+
+let advance state event = Solana_rpc.Submission.advance state event |> get
+
+let submission_to_confirmation config keypair latest =
+  let transaction = signed_transfer keypair latest.Solana_rpc.Methods.blockhash in
+  let state = Solana_rpc.Submission.start config in
+  let state = advance state (Solana_rpc.Submission.Latest_blockhash (context latest)) in
+  let state = advance state (Solana_rpc.Submission.Signed transaction) in
+  let simulation : Solana_rpc.Methods.simulation =
+    { err = None; logs = None; units_consumed = None }
+  in
+  let state = advance state (Solana_rpc.Submission.Simulation (context simulation)) in
+  let signature = Solana_transaction.Transaction.id transaction in
+  let state = advance state (Solana_rpc.Submission.Submitted signature) in
+  state, signature
+
+let submission_stale_blockhash_retry () =
+  let keypair = get (Solana_crypto.keypair_of_seed (bytes 12 32)) in
+  let config =
+    Solana_rpc.Submission.config ~max_attempts:2 ~max_confirmation_polls:3
+      ~commitment:Solana_types.Confirmed
+    |> get
+  in
+  let latest : Solana_rpc.Methods.latest_blockhash =
+    { blockhash = hash 20;
+      last_valid_block_height = get (Solana_types.U64.of_int 100) }
+  in
+  let transaction = signed_transfer keypair latest.blockhash in
+  let state = Solana_rpc.Submission.start config in
+  let state = advance state (Solana_rpc.Submission.Latest_blockhash (context latest)) in
+  let state = advance state (Solana_rpc.Submission.Signed transaction) in
+  let simulation : Solana_rpc.Methods.simulation =
+    { err = None; logs = None; units_consumed = None }
+  in
+  let state = advance state (Solana_rpc.Submission.Simulation (context simulation)) in
+  let stale =
+    Solana_rpc.Error.Rpc
+      { code = -32002; message = "Transaction simulation failed";
+        data = Some (`Assoc [ "err", `String "BlockhashNotFound" ]) }
+  in
+  let state = advance state (Solana_rpc.Submission.Rpc_error stale) in
+  Alcotest.(check int) "fresh attempt" 2
+    (Solana_rpc.Submission.attempts_started state);
+  match Solana_rpc.Submission.action state with
+  | Fetch_latest_blockhash -> ()
+  | _ -> Alcotest.fail "stale blockhash did not request a fresh blockhash"
+
+let submission_expiry_and_timeout () =
+  let keypair = get (Solana_crypto.keypair_of_seed (bytes 13 32)) in
+  let config =
+    Solana_rpc.Submission.config ~max_attempts:2 ~max_confirmation_polls:2
+      ~commitment:Solana_types.Confirmed
+    |> get
+  in
+  let latest : Solana_rpc.Methods.latest_blockhash =
+    { blockhash = hash 21;
+      last_valid_block_height = get (Solana_types.U64.of_int 100) }
+  in
+  let state, _signature = submission_to_confirmation config keypair latest in
+  let state =
+    advance state
+      (Solana_rpc.Submission.Signature_statuses (context [ None ]))
+  in
+  let state =
+    advance state
+      (Solana_rpc.Submission.Block_height (get (Solana_types.U64.of_int 101)))
+  in
+  Alcotest.(check int) "expired attempt refresh" 2
+    (Solana_rpc.Submission.attempts_started state);
+  let latest =
+    { Solana_rpc.Methods.blockhash = hash 22;
+      last_valid_block_height = get (Solana_types.U64.of_int 200) }
+  in
+  let state, _signature = submission_to_confirmation config keypair latest in
+  let pending state height =
+    let state =
+      advance state
+        (Solana_rpc.Submission.Signature_statuses (context [ None ]))
+    in
+    advance state
+      (Solana_rpc.Submission.Block_height (get (Solana_types.U64.of_int height)))
+  in
+  let state = pending state 150 in
+  let state = advance state Solana_rpc.Submission.Waited in
+  let state = pending state 151 in
+  match Solana_rpc.Submission.action state with
+  | Finished (Failed (Confirmation_timeout 2)) -> ()
+  | _ -> Alcotest.fail "confirmation polling did not stop at its deterministic timeout"
+
+let websocket_reconnect () =
+  let keypair = get (Solana_crypto.keypair_of_seed (bytes 14 32)) in
+  let signature =
+    signed_transfer keypair (hash 23) |> Solana_transaction.Transaction.id
+  in
+  let state = Solana_rpc.Subscriptions.create () in
+  let state, signature_id, signature_commands =
+    Solana_rpc.Subscriptions.add state
+      (Signature
+         { signature; commitment = Solana_types.Confirmed;
+           enable_received_notification = true })
+  in
+  Alcotest.(check int) "offline signature commands" 0 (List.length signature_commands);
+  let state, account_id, _ =
+    Solana_rpc.Subscriptions.add state
+      (Account
+         { address = address 24; commitment = Solana_types.Confirmed;
+           encoding = Base64 })
+  in
+  let state, commands = Solana_rpc.Subscriptions.connected state in
+  Alcotest.(check int) "initial subscriptions" 2 (List.length commands);
+  let state, _, _ =
+    Solana_rpc.Subscriptions.receive state
+      {|{"jsonrpc":"2.0","id":0,"result":100}|}
+    |> get
+  in
+  let state, _, _ =
+    Solana_rpc.Subscriptions.receive state
+      {|{"jsonrpc":"2.0","id":1,"result":200}|}
+    |> get
+  in
+  Alcotest.(check int) "active subscriptions" 2
+    (Solana_rpc.Subscriptions.active_count state);
+  let state = Solana_rpc.Subscriptions.disconnected state in
+  Alcotest.(check int) "server IDs dropped" 0
+    (Solana_rpc.Subscriptions.active_count state);
+  let state, commands = Solana_rpc.Subscriptions.connected state in
+  Alcotest.(check int) "resubscriptions" 2 (List.length commands);
+  let state, _, _ =
+    Solana_rpc.Subscriptions.receive state
+      {|{"jsonrpc":"2.0","id":2,"result":300}|}
+    |> get
+  in
+  let state, _, _ =
+    Solana_rpc.Subscriptions.receive state
+      {|{"jsonrpc":"2.0","id":3,"result":400}|}
+    |> get
+  in
+  let state, outputs, _ =
+    Solana_rpc.Subscriptions.receive state
+      {|{"jsonrpc":"2.0","method":"signatureNotification","params":{"subscription":300,"result":"receivedSignature"}}|}
+    |> get
+  in
+  Alcotest.(check int) "received notification" 1 (List.length outputs);
+  Alcotest.(check int) "one-shot remains until result" 2
+    (Solana_rpc.Subscriptions.desired_count state);
+  let state, outputs, _ =
+    Solana_rpc.Subscriptions.receive state
+      {|{"jsonrpc":"2.0","method":"signatureNotification","params":{"subscription":300,"result":{"context":{"slot":9},"value":{"err":null}}}}|}
+    |> get
+  in
+  (match outputs with
+  | [ Notification { local_id; _ } ] ->
+    Alcotest.(check int) "signature local ID" signature_id local_id
+  | _ -> Alcotest.fail "missing final signature notification");
+  Alcotest.(check int) "one-shot removed" 1
+    (Solana_rpc.Subscriptions.desired_count state);
+  let state, outputs, _ =
+    Solana_rpc.Subscriptions.receive state
+      {|{"jsonrpc":"2.0","method":"accountNotification","params":{"subscription":400,"result":{"context":{"slot":10},"value":{"lamports":1}}}}|}
+    |> get
+  in
+  (match outputs with
+  | [ Notification { local_id; _ } ] ->
+    Alcotest.(check int) "account local ID" account_id local_id
+  | _ -> Alcotest.fail "missing account notification");
+  Alcotest.(check int) "account remains desired" 1
+    (Solana_rpc.Subscriptions.desired_count state)
+
 let () =
   Alcotest.run "ocaml-solana"
     [ "wire", [ Alcotest.test_case "legacy golden" `Quick legacy_fixture; Alcotest.test_case "v0 golden" `Quick v0_fixture; Alcotest.test_case "Kit token vectors" `Quick kit_token_fixture; Alcotest.test_case "reject v1" `Quick version_rejection ];
@@ -357,4 +536,9 @@ let () =
       "policy", [ Alcotest.test_case "lookup-table substitution" `Quick lookup_table_policy ];
       "shortvec", [ Alcotest.test_case "boundary vectors" `Quick shortvec_vectors; QCheck_alcotest.to_alcotest shortvec_property ];
       "signing", [ Alcotest.test_case "Ed25519 transaction" `Quick signing ];
-      "rpc", [ Alcotest.test_case "decode latest blockhash" `Quick rpc_decode; Alcotest.test_case "confirmation state" `Quick confirmation ] ]
+      "rpc",
+      [ Alcotest.test_case "decode latest blockhash" `Quick rpc_decode;
+        Alcotest.test_case "confirmation state" `Quick confirmation;
+        Alcotest.test_case "stale blockhash retry" `Quick submission_stale_blockhash_retry;
+        Alcotest.test_case "expiry and timeout" `Quick submission_expiry_and_timeout;
+        Alcotest.test_case "WebSocket reconnect" `Quick websocket_reconnect ] ]

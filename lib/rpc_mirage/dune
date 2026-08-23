@@ -1,0 +1,4 @@
+(library
+ (name solana_rpc_mirage)
+ (public_name solana-rpc-mirage)
+ (libraries solana-rpc lwt http-mirage-client mimic))

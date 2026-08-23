@@ -1,4 +1,4 @@
 (executable
  (name smoke)
  (modules smoke)
- (libraries solana-types solana-transaction))
+ (libraries solana-types solana-transaction solana-rpc solana-rpc-mirage))

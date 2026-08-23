@@ -65,4 +65,5 @@ val resolve_accounts :
 val header : t -> header
 val static_accounts : t -> Solana_types.Address.t list
 val recent_blockhash : t -> Solana_types.Hash.t
+val with_recent_blockhash : Solana_types.Hash.t -> t -> t
 val instructions : t -> compiled_instruction list

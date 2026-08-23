@@ -2,7 +2,7 @@ module type CLIENT = sig
   type ctx
   type body
   val body_of_string : string -> body
-  val body_to_string : body -> string Lwt.t
+  val body_to_stream : body -> string Lwt_stream.t
   val post :
     ?ctx:ctx ->
     ?body:body ->

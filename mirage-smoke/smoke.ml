@@ -12,4 +12,10 @@ let () =
     Solana_transaction.Message.compile_legacy ~payer ~recent_blockhash [ instruction ]
     |> get
   in
-  ignore (Solana_transaction.Message.encode message |> get)
+  ignore (Solana_transaction.Message.encode message |> get);
+  let workflow =
+    Solana_rpc.Submission.config ~max_attempts:2 ~max_confirmation_polls:20
+      ~commitment:Solana_types.Confirmed
+    |> get |> Solana_rpc.Submission.start
+  in
+  ignore (Solana_rpc.Submission.action workflow)

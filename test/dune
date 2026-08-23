@@ -1,5 +1,6 @@
 (test
  (name test_solana)
+ (modules test_solana)
  (package solana)
  (deps
   ../conformance/fixtures/kit-8.0.0-token.json
@@ -14,3 +15,9 @@
   qcheck-alcotest
   yojson
   zarith))
+
+(test
+ (name test_rpc_cohttp)
+ (modules test_rpc_cohttp)
+ (package solana-rpc-cohttp)
+ (libraries solana-rpc solana-rpc-cohttp alcotest lwt uri http))

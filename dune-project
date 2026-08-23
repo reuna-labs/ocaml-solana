@@ -62,7 +62,8 @@
   (lwt (>= 5.6.0))
   (uri (>= 4.2.0))
   (http (>= 6.1.0))
-  (cohttp-lwt (>= 6.1.0))))
+  (cohttp-lwt (>= 6.1.0))
+  (alcotest :with-test)))
 
 (package
  (name solana-rpc-unix)
@@ -79,7 +80,21 @@
   (uri (>= 4.2.0))
   (http (>= 6.1.0))
   (cohttp-lwt (>= 6.1.0))
-  (cohttp-lwt-unix (>= 6.1.0))))
+  (cohttp-lwt-unix (>= 6.1.0))
+  conduit-lwt-unix
+  resolver-lwt-unix
+  websocket-lwt-unix))
+
+(package
+ (name solana-rpc-mirage)
+ (synopsis "MirageOS HTTP/TLS transport for Solana JSON-RPC")
+ (depends
+  (ocaml (>= 4.14))
+  (dune (>= 3.6))
+  (solana-rpc (= :version))
+  (lwt (>= 5.6.0))
+  http-mirage-client
+  mimic))
 
 (package
  (name solana)

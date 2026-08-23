@@ -500,6 +500,9 @@ let decode source =
 let header = function Legacy message -> message.header | V0 message -> message.header
 let static_accounts = function Legacy message -> message.static_accounts | V0 message -> message.static_accounts
 let recent_blockhash = function Legacy message -> message.recent_blockhash | V0 message -> message.recent_blockhash
+let with_recent_blockhash recent_blockhash = function
+  | Legacy message -> Legacy { message with recent_blockhash }
+  | V0 message -> V0 { message with recent_blockhash }
 let instructions = function Legacy message -> message.instructions | V0 message -> message.instructions
 
 let required_signers message =

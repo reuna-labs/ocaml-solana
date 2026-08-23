@@ -20,6 +20,9 @@ depends: [
   "http" {>= "6.1.0"}
   "cohttp-lwt" {>= "6.1.0"}
   "cohttp-lwt-unix" {>= "6.1.0"}
+  "conduit-lwt-unix"
+  "resolver-lwt-unix"
+  "websocket-lwt-unix"
   "odoc" {with-doc}
 ]
 build: [
