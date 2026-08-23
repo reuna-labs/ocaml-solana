@@ -27,19 +27,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - ocaml-compiler: "4.14.2"
-            container-tag: ubuntu-24.04-ocaml-4.14
-          - ocaml-compiler: "5.2.1"
-            container-tag: ubuntu-24.04-ocaml-5.2
+        ocaml-compiler: ["4.14.2", "5.2.1"]
     runs-on: [self-hosted, Linux, X64, reuna-builder-x86]
-    container:
-      image: ocaml/opam:${{ matrix.container-tag }}
+    env:
+      GMP_PREFIX: ${{ runner.temp }}/ocaml-solana-gmp-${{ matrix.ocaml-compiler }}
+      CPATH: ${{ runner.temp }}/ocaml-solana-gmp-${{ matrix.ocaml-compiler }}/include
+      LIBRARY_PATH: ${{ runner.temp }}/ocaml-solana-gmp-${{ matrix.ocaml-compiler }}/lib
+      LD_LIBRARY_PATH: ${{ runner.temp }}/ocaml-solana-gmp-${{ matrix.ocaml-compiler }}/lib
+      PKG_CONFIG_PATH: ${{ runner.temp }}/ocaml-solana-gmp-${{ matrix.ocaml-compiler }}/lib/pkgconfig
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify the compiler image
-        run: test "$(ocamlc -version)" = "${{ matrix.ocaml-compiler }}"
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          opam-local-packages: "*.opam"
+          opam-disable-sandboxing: true
+
+      - name: Build the GMP prerequisite without host privileges
+        env:
+          GMP_VERSION: "6.3.0"
+          GMP_SHA256: a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898
+        run: |
+          archive="$RUNNER_TEMP/gmp-$GMP_VERSION.tar.xz"
+          source_dir="$RUNNER_TEMP/gmp-$GMP_VERSION"
+          curl --fail --location --output "$archive" \
+            "https://gmplib.org/download/gmp/gmp-$GMP_VERSION.tar.xz"
+          echo "$GMP_SHA256  $archive" | sha256sum --check --strict
+          tar --extract --xz --file "$archive" --directory "$RUNNER_TEMP"
+          cd "$source_dir"
+          ./configure --prefix="$GMP_PREFIX" --with-pic
+          make -j"$(nproc)"
+          make check
+          make install
 
       - name: Pin lean codecs
         run: |
