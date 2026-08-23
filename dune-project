@@ -84,7 +84,7 @@
   (base64 (>= 3.3.0))
   conduit-lwt
   conduit-lwt-unix
-  websocket))
+  (websocket (>= 2.17))))
 
 (package
  (name solana-rpc-mirage)
