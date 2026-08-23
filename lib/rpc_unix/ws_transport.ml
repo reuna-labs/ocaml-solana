@@ -14,11 +14,6 @@ exception Http_error of string
 let fail_unless condition exception_ =
   if condition then Lwt.return_unit else Lwt.fail exception_
 
-let set_tcp_nodelay = function
-  | Conduit_lwt_unix.TCP { fd; _ } ->
-    Lwt_unix.setsockopt fd Lwt_unix.TCP_NODELAY true
-  | _ -> ()
-
 let handshake request input output nonce =
   let open Cohttp in
   Request.write (fun _writer -> Lwt.return_unit) request output >>= fun () ->
@@ -69,8 +64,7 @@ let connect ?(extra_headers = Cohttp.Header.init ())
         ("Sec-WebSocket-Version", "13") ]
   in
   let request = Cohttp.Request.make ~headers uri in
-  Conduit_lwt_unix.connect ~ctx client >>= fun (flow, input, output) ->
-  set_tcp_nodelay flow;
+  Conduit_lwt_unix.connect ~ctx client >>= fun (_flow, input, output) ->
   Lwt.catch
     (fun () -> handshake request input output nonce)
     (fun exception_ ->
