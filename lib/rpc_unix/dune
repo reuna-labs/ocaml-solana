@@ -8,6 +8,7 @@
   lwt.unix
   uri
   http
+  cohttp
   cohttp-lwt
   cohttp-lwt-unix
   base64

@@ -79,6 +79,7 @@
   (lwt (>= 5.6.0))
   (uri (>= 4.2.0))
   (http (>= 6.1.0))
+  (cohttp (>= 6.1.0))
   (cohttp-lwt (>= 6.1.0))
   (cohttp-lwt-unix (>= 6.1.0))
   (base64 (>= 3.3.0))
@@ -96,6 +97,7 @@
   (solana-rpc (= :version))
   (lwt (>= 5.6.0))
   http-mirage-client
+  h1
   mimic))
 
 (package

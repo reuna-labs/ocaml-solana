@@ -13,6 +13,7 @@ depends: [
   "solana-rpc" {= version}
   "lwt" {>= "5.6.0"}
   "http-mirage-client"
+  "h1"
   "mimic"
   "odoc" {with-doc}
 ]

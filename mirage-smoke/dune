@@ -6,6 +6,7 @@
 (executable
  (name unikernel)
  (modules unikernel)
+ (flags (:standard -w -32-60))
  (libraries
   solana-types
   solana-transaction
