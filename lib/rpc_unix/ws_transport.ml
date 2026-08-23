@@ -53,8 +53,10 @@ let handshake request input output nonce =
       (Cohttp.Header.get headers "sec-websocket-accept" = Some expected)
       (Websocket.Protocol_error "wrong Sec-WebSocket-Accept header")
 
+let secure_random length = Mirage_crypto_rng_unix.getrandom length
+
 let connect ?(extra_headers = Cohttp.Header.init ())
-    ?(random_string = Websocket.Rng.init ())
+    ?(random_string = secure_random)
     ?(ctx = Lazy.force Conduit_lwt_unix.default_ctx) client uri =
   let nonce = Base64.encode_exn (random_string 16) in
   let headers =

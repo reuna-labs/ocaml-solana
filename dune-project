@@ -84,6 +84,7 @@
   (base64 (>= 3.3.0))
   conduit-lwt
   conduit-lwt-unix
+  (mirage-crypto-rng (>= 1.0.0))
   (websocket (>= 2.17))))
 
 (package

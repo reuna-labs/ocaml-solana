@@ -13,4 +13,5 @@
   base64
   conduit-lwt
   conduit-lwt-unix
+  mirage-crypto-rng.unix
   websocket))
