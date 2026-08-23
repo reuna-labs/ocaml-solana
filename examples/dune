@@ -10,5 +10,4 @@
   solana-rpc-unix
   lwt
   lwt.unix
-  uri
-  yojson))
+  uri))

@@ -2,3 +2,14 @@
  (name smoke)
  (modules smoke)
  (libraries solana-types solana-transaction solana-rpc solana-rpc-mirage))
+
+(executable
+ (name unikernel)
+ (modules unikernel)
+ (libraries
+  solana-types
+  solana-transaction
+  solana-rpc
+  solana-rpc-mirage
+  http-mirage-client
+  lwt))

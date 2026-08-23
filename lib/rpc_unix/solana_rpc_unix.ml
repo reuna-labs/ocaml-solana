@@ -24,7 +24,14 @@ module Websocket = struct
 
   let connect uri =
     let open Lwt.Infix in
-    Resolver_lwt.resolve_uri ~uri Resolver_lwt_unix.system >>= fun endpoint ->
+    let resolver_uri =
+      match Uri.scheme uri with
+      | Some "ws" -> Uri.with_scheme uri (Some "http")
+      | Some "wss" -> Uri.with_scheme uri (Some "https")
+      | _ -> uri
+    in
+    Resolver_lwt.resolve_uri ~uri:resolver_uri Resolver_lwt_unix.system
+    >>= fun endpoint ->
     let ctx = Lazy.force Conduit_lwt_unix.default_ctx in
     Conduit_lwt_unix.endp_to_client ~ctx endpoint >>= fun client ->
     Websocket_lwt_unix.connect ~ctx client uri
