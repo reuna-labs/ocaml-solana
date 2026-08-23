@@ -83,6 +83,7 @@
   (cohttp-lwt (>= 6.1.0))
   (cohttp-lwt-unix (>= 6.1.0))
   (base64 (>= 3.3.0))
+  (conduit (>= 8.0.0))
   conduit-lwt
   conduit-lwt-unix
   (mirage-crypto-rng (>= 1.0.0))
@@ -99,6 +100,7 @@
   http-mirage-client
   h1
   h2
+  fmt
   mimic))
 
 (package

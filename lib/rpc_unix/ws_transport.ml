@@ -68,11 +68,12 @@ let connect ?(extra_headers = Cohttp.Header.init ())
         ("Sec-WebSocket-Version", "13") ]
   in
   let request = Cohttp.Request.make ~headers uri in
-  Conduit_lwt_unix.connect ~ctx client >>= fun (_flow, input, output) ->
+  Conduit_lwt_unix.connect ~ctx client >>= fun (_flow, raw_input, output) ->
+  let input = Cohttp_lwt_unix.Private.Input_channel.create raw_input in
   Lwt.catch
     (fun () -> handshake request input output nonce)
     (fun exception_ ->
-      Lwt_io.close input >>= fun () ->
+      Lwt_io.close raw_input >>= fun () ->
       Lwt.fail exception_)
   >|= fun () ->
   let read_frame =
@@ -80,7 +81,7 @@ let connect ?(extra_headers = Cohttp.Header.init ())
   in
   let read_frame () =
     Lwt.catch read_frame (fun exception_ ->
-      Lwt.async (fun () -> Lwt_io.close input);
+      Lwt.async (fun () -> Lwt_io.close raw_input);
       Lwt.fail exception_)
   in
   let buffer = Buffer.create 128 in
@@ -98,7 +99,7 @@ let connect ?(extra_headers = Cohttp.Header.init ())
         Lwt.async (fun () -> Lwt_io.close output);
         Lwt.fail exception_)
   in
-  { read_frame; write_frame; input; output }
+  { read_frame; write_frame; input = raw_input; output }
 
 let read t = t.read_frame ()
 let write t = t.write_frame

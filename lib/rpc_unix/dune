@@ -12,6 +12,7 @@
   cohttp-lwt
   cohttp-lwt-unix
   base64
+  conduit
   conduit-lwt
   conduit-lwt-unix
   mirage-crypto-rng.unix

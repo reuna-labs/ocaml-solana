@@ -15,6 +15,7 @@ depends: [
   "http-mirage-client"
   "h1"
   "h2"
+  "fmt"
   "mimic"
   "odoc" {with-doc}
 ]
