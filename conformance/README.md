@@ -20,7 +20,8 @@ have separate legacy fixtures: both messages have the same intent, but their
 compilers choose different valid account-key orders. OCaml compilation must
 match Agave byte-for-byte and must decode and policy-check both outputs.
 
-The `sdk-conformance` CI job regenerates both files from exact lockfiles:
+The `sdk-conformance` CI job runs on the organization-owned Linux/X64 builder
+and regenerates both files from exact lockfiles:
 
 ```sh
 npm ci --prefix conformance/kit
