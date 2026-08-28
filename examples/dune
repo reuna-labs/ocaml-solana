@@ -11,3 +11,9 @@
   lwt
   lwt.unix
   uri))
+
+(executable
+ (name address_of_key)
+ (package solana-rpc-unix)
+ (public_name solana-address-of-key)
+ (libraries solana-types solana-crypto))
