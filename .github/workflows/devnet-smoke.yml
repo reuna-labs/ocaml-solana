@@ -5,7 +5,10 @@ on:
 
 jobs:
   transfer:
-    runs-on: ubuntu-latest
+    # Keep the guarded live job on the same trusted Reuna runner used by the
+    # other signing smokes. This also avoids making testnet evidence depend on
+    # GitHub-hosted runner billing state.
+    runs-on: [self-hosted, Linux, X64, reuna-builder-x86]
     environment: devnet
     steps:
       - uses: actions/checkout@v4
