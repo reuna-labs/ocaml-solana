@@ -52,7 +52,10 @@ jobs:
           SOLANA_SEED_HEX: ${{ secrets.SOLANA_DEVNET_SEED_HEX }}
           SOLANA_DESTINATION: ${{ vars.SOLANA_DEVNET_DESTINATION }}
           SOLANA_EXPECTED_GENESIS_HASH: ${{ vars.SOLANA_DEVNET_GENESIS_HASH }}
-          SOLANA_LAMPORTS: "5000"
+          # The disposable destination is a new system account. Its first
+          # transfer must clear Devnet's rent-exempt minimum; 5,000 lamports
+          # is rejected by simulation with InsufficientFundsForRent.
+          SOLANA_LAMPORTS: "1000000"
           SOLANA_TOKEN_MINT: ${{ vars.SOLANA_DEVNET_TOKEN_MINT }}
           SOLANA_TOKEN_AMOUNT: ${{ vars.SOLANA_DEVNET_TOKEN_AMOUNT }}
           SOLANA_TOKEN_DECIMALS: ${{ vars.SOLANA_DEVNET_TOKEN_DECIMALS }}
