@@ -86,6 +86,7 @@
   (conduit (>= 8.0.0))
   conduit-lwt
   conduit-lwt-unix
+  (tls-lwt (>= 2.0.0))
   (mirage-crypto-rng (>= 1.0.0))
   (websocket (>= 2.17))))
 
