@@ -10,6 +10,18 @@ MirageOS adapter.
 > **Security:** this code is new, unaudited alpha software. Do not use it to
 > control assets of value.
 
+## Install
+
+```sh
+opam repository add reuna https://github.com/reuna-labs/opam-repository.git
+opam update
+opam install solana-rpc-unix.0.1.0~alpha1
+```
+
+This installs the hosted client and pure transaction packages from the public
+`v0.1.0-alpha1` release. No vendored-codec or development pin is required for
+an installed consumer.
+
 ## Compatibility target
 
 The checked-in wire fixtures are pinned to Agave `v4.2.1`, including
@@ -18,7 +30,7 @@ The checked-in wire fixtures are pinned to Agave `v4.2.1`, including
 `@solana/kit` `v8.0.0`. Transaction v1 remains pending activation and is
 rejected as unsupported.
 
-## Build
+## Build from a checkout
 
 Pin the credential-free vendored codec snapshot, install dependencies, and run:
 
