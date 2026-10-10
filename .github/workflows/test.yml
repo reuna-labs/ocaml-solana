@@ -2,12 +2,17 @@ name: test
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   sdk-conformance:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
@@ -17,7 +22,7 @@ jobs:
         run: |
           node conformance/kit/generate.mjs > /tmp/kit-token.json
           diff -u conformance/fixtures/kit-8.0.0-token.json /tmp/kit-token.json
-      - uses: dtolnay/rust-toolchain@1.89.0
+      - uses: dtolnay/rust-toolchain@d77020bf130f2e8c39c025bf9c4c3a445fe2b9fa # 1.89.0
       - name: Regenerate Agave 4.2.1 fixtures
         run: |
           cargo run --locked --quiet --manifest-path conformance/agave/Cargo.toml > /tmp/agave-token.json
@@ -30,9 +35,11 @@ jobs:
         ocaml-compiler: ["4.14.2", "5.2.1"]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
-      - uses: ocaml/setup-ocaml@v3
+      - uses: ocaml/setup-ocaml@93303b622b2522e4411e295f9e77411a24912ac7 # v3.9.0
         with:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           opam-local-packages: "*.opam"
@@ -56,10 +63,12 @@ jobs:
           ./configure --prefix="$gmp_prefix" --with-pic
           make -j"$(nproc)"
           make install
-          echo "CPATH=$gmp_prefix/include" >> "$GITHUB_ENV"
-          echo "LIBRARY_PATH=$gmp_prefix/lib" >> "$GITHUB_ENV"
-          echo "LD_LIBRARY_PATH=$gmp_prefix/lib" >> "$GITHUB_ENV"
-          echo "PKG_CONFIG_PATH=$gmp_prefix/lib/pkgconfig" >> "$GITHUB_ENV"
+          {
+            echo "CPATH=$gmp_prefix/include"
+            echo "LIBRARY_PATH=$gmp_prefix/lib"
+            echo "LD_LIBRARY_PATH=$gmp_prefix/lib"
+            echo "PKG_CONFIG_PATH=$gmp_prefix/lib/pkgconfig"
+          } >> "$GITHUB_ENV"
 
       - name: Pin lean codecs
         run: |
