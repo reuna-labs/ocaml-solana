@@ -105,6 +105,17 @@ requires `SOLANA_ALLOW_TOKEN_2022=1` after mint-extension review.
 Devnet can be reset. Override `SOLANA_EXPECTED_GENESIS_HASH` when a deliberate
 reset has been independently verified. Never use a production seed here.
 
+### Devnet check, unfunded
+
+`tools/devnet-check.sh` needs no SOL and nothing from this checkout's build. It
+installs `solana-transaction` from the public Reuna opam overlay in a pinned
+container, signs a transfer from a fresh key, and asks devnet to
+`simulateTransaction` it with `sigVerify`. As signed, the node verifies the
+signature and stops at the unfunded payer (`AccountNotFound`). With one bit
+flipped in the signature or in the message, it refuses with `SignatureFailure`.
+That shows the released packages' wire bytes and Ed25519 signature are what a
+Solana node accepts; execution still needs the funded smoke above.
+
 ## Package boundaries
 
 `solana-types`, `solana-crypto`, and `solana-transaction` contain no Unix,
